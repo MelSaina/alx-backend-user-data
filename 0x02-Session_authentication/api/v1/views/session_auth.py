@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-""" Session authentication route module
+""" Session authen route module
 """
 from api.v1.views import app_views
 from flask import abort, jsonify, make_response, request

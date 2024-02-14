@@ -52,7 +52,7 @@ class SessionDBAuth(SessionExpAuth):
         return None
 
     def destroy_session(self, request=None) -> bool:
-        """ Destroy session object based on session identity
+        """ Destroy session object based on session id
         """
         if not request:
             return False
