@@ -10,6 +10,7 @@ import os
 
 app = Flask(__name__)
 app.register_blueprint(app_views)
+app.config["JSONIFY_PRETTYPRINT_REGULAR"] = True
 CORS(app, resources={r"/api/v1/*": {"origins": "*"}})
 auth = None
 # Check authentication type
@@ -20,6 +21,15 @@ if auth_type == 'auth':
 if auth_type == 'basic_auth':
     from api.v1.auth.basic_auth import BasicAuth
     auth = BasicAuth()
+if auth_type == 'session_auth':
+    from api.v1.auth.session_auth import SessionAuth
+    auth = SessionAuth()
+if auth_type == 'session_exp_auth':
+    from api.v1.auth.session_exp_auth import SessionExpAuth
+    auth = SessionExpAuth()
+if auth_type == 'session_db_auth':
+    from api.v1.auth.session_db_auth import SessionDBAuth
+    auth = SessionDBAuth()
 
 
 @app.errorhandler(404)
@@ -53,14 +63,22 @@ def before_request():
     # Check if path doesn't require authorization
     if not auth.require_auth(request.path, ['/api/v1/status/',
                                             '/api/v1/unauthorized/',
-                                            '/api/v1/forbidden/']):
+                                            '/api/v1/forbidden/',
+                                            '/api/v1/auth_session/login/']):
         return
-    # Check authorization header if path requires authorization
-    if not auth.authorization_header(request):
+
+    # Check for existence of an authentication scheme
+    # Either: session authentication and basic auth
+    session_cookie = auth.session_cookie(request)
+    auth_header = auth.authorization_header(request)
+    if not session_cookie and not auth_header:
         abort(401)
+
     # Check if current user is authorized to access the route
-    if not auth.current_user(request):
+    current_user = auth.current_user(request)
+    if not current_user:
         abort(403)
+    setattr(request, "current_user", current_user)
 
 
 if __name__ == "__main__":
