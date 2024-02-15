@@ -1,70 +1,55 @@
 #!/usr/bin/env python3
 """
-Session storage module
+Defines Session Auth class that uses a file storage DB
 """
-from api.v1.auth.session_exp_auth import SessionExpAuth
 from datetime import datetime, timedelta
+from typing import Union
+
 from models.user_session import UserSession
+from api.v1.auth.session_exp_auth import SessionExpAuth
 
 
 class SessionDBAuth(SessionExpAuth):
-    """ Session class for storable and persistent
-        sessions
     """
-    def create_session(self, user_id: str = None) -> str:
-        """ Creates session object
-            Return:
-                - id of session object
+    Database Session Authentication implementation
+    """
+    def create_session(self, user_id=None) -> Union[str, None]:
         """
-        if not user_id or type(user_id) is not str:
-            return None
-
-        session = UserSession(**{"user_id": user_id})
-        session.save()
-        SessionDBAuth.user_id_by_session_id[session.session_id] =\
-            session.user_id
-        return session.session_id
-
-    def user_id_for_session_id(self, session_id: str = None) -> str:
-        """ Get user by session id
+        Create session id from random string
         """
-        if not session_id or type(session_id) is not str:
+        if user_id is None or type(user_id) != str:
             return None
-        try:
-            sessions = UserSession.search({"session_id": session_id})
-        except KeyError:
-            return None
-        if not sessions:
-            return None
-        session = sessions[0]
+        session_id = super().create_session(user_id)
+        if session_id:
+            kwargs = {'user_id': user_id, 'session_id': session_id}
+            new_user_session = UserSession(**kwargs)
+            new_user_session.save()
+        return session_id
 
-        # Session with infinity lifespan
-        if self.session_duration <= 0:
-            return session.user_id
-
-        # Check for expired session
-        expiry_date = session.updated_at \
-            + timedelta(seconds=self.session_duration)
-        if datetime.utcnow() < expiry_date:
-            return session.user_id
-        SessionDBAuth.user_id_by_session_id.pop(session_id)
-        session.remove()
+    def user_id_for_session_id(self, session_id=None) -> Union[str, None]:
+        """
+        Get user id based on session id from DB
+        """
+        users_session = UserSession.search({'session_id': session_id})
+        if users_session != []:
+            if not (timedelta(seconds=self.session_duration) +
+                    users_session[0].created_at <= datetime.now()):
+                return users_session[0].user_id
         return None
 
     def destroy_session(self, request=None) -> bool:
-        """ Destroy session object based on session id
         """
-        if not request:
+        Deletes the user session from DB / logout user
+        """
+        if request is None:
             return False
         session_id = self.session_cookie(request)
-        try:
-            sessions = UserSession.search({"session_id": session_id})
-        except KeyError:
+        if session_id is None:
             return False
-
-        if sessions:
-            session = sessions[0]
-            SessionDBAuth.user_id_by_session_id.pop(session.session_id)
-            session.remove()
+        if self.user_id_for_session_id(session_id) is None:
+            return False
+        usersession = UserSession.search({'session_id': session_id})
+        if usersession != []:
+            usersession[0].remove()
             return True
         return False

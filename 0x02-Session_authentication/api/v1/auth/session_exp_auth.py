@@ -1,68 +1,54 @@
 #!/usr/bin/env python3
 """
-Expiring session module
-exp
+Defines SessionExpAuth class that implements session expiration
 """
-from api.v1.auth.session_auth import SessionAuth
+import os
 from datetime import datetime, timedelta
-from os import getenv
+from typing import Union
+
+from api.v1.auth.session_auth import SessionAuth
 
 
 class SessionExpAuth(SessionAuth):
-    """ Expiring session class
     """
-    def __init__(self) -> None:
-        """ Initialize SessionExpAuth instance
+    Session Authentication class with expiration
+    """
+    def __init__(self):
+        """
+        Instialize a SessionExpAuth instance
         """
         super().__init__()
-        duration = getenv('SESSION_DURATION')
-        if not duration:
-            self.session_duration = 0
-        else:
-            try:
-                duration = int(duration)
-                self.session_duration = duration
-            except ValueError:
-                self.session_duration = 0
+        try:
+            duration = int(os.environ.get('SESSION_DURATION', 0))
+        except Exception:
+            duration = 0
+        self.session_duration = duration
 
-    def create_session(self, user_id: str = None) -> str:
-        """ Gets session_id from parent class method
-            Updates user_id_by_session_id dictionary to hold
-            key-pair value
-            Return:
-             - None if session_id can't be created
-             - session id if created
+    def create_session(self, user_id=None) -> Union[str, None]:
+        """
+        Create session id from random string
         """
         session_id = super().create_session(user_id)
-        if not session_id:
+        if session_id is None:
             return None
-        user_id = SessionExpAuth.user_id_by_session_id.get(session_id)
-        created_at = datetime.now()
-        session_dict = {"user_id": user_id, "created_at": created_at}
-        SessionExpAuth.user_id_by_session_id.update({session_id: session_dict})
+        self.user_id_by_session_id[session_id] = {
+            'user_id': user_id, 'created_at': datetime.now()}
         return session_id
 
-    def user_id_for_session_id(self, session_id: str = None) -> str:
-        """ Gets user id associated with passed session id
-            Return:
-                - user's id
+    def user_id_for_session_id(self, session_id=None) -> Union[str, None]:
         """
-        if not session_id and type(session_id) is not str:
+        Get user id from given session id
+        """
+        if session_id is None:
             return None
-        session_info = SessionExpAuth.user_id_by_session_id.get(session_id)
-        if not session_info:
+        if session_id not in self.user_id_by_session_id:
             return None
-        user_id = session_info.get("user_id")
-        created_at = session_info.get("created_at")
-
-        # Get user id for session with no expiry duration
+        session_dictionary = self.user_id_by_session_id.get(session_id)
         if self.session_duration <= 0:
-            return user_id
-
-        # Get user id for associated with expiry session
-        if not created_at:
+            return session_dictionary.get('user_id')
+        if 'created_at' not in session_dictionary:
             return None
-        expiry_date = created_at + timedelta(seconds=self.session_duration)
-        if datetime.now() > expiry_date:
+        if timedelta(seconds=self.session_duration) + \
+                session_dictionary.get('created_at') <= datetime.now():
             return None
-        return user_id
+        return session_dictionary.get('user_id')

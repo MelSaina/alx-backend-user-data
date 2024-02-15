@@ -1,53 +1,62 @@
 #!/usr/bin/env python3
-""" Session authen route module
 """
-from api.v1.views import app_views
-from flask import abort, jsonify, make_response, request
+Defines a SessionAuth class that inherits from Auth class
+"""
+import uuid
+from typing import (
+    TypeVar,
+    Union
+)
+from api.v1.auth.auth import Auth
 from models.user import User
-from os import getenv
 
 
-@app_views.route('/auth_session/login', methods=['POST'],
-                 strict_slashes=False)
-def login():
-    """ Session authentication route
-        POST parameters:
-            - email: user's email
-            - password: user's password
-        Returns - response with user details and session cookie
+class SessionAuth(Auth):
     """
-    email = request.form.get('email')
-    pwd = request.form.get('password')
-    if not email:
-        return jsonify({"error": "email missing"}), 400
-    if not pwd:
-        return jsonify({"error": "password missing"}), 400
-    users = User.search({"email": email})
-    if not users:
-        return jsonify({"error": "no user found for this email"}), 404
-    current_user = None
-    for user in users:
-        if user.is_valid_password(pwd):
-            current_user = user
-            break
-    if not current_user:
-        return jsonify({"error": "wrong password"}), 401
-    from api.v1.app import auth
-    session_id = auth.create_session(user.id)
-    response = make_response(jsonify(user.to_json()), 200)
-    response.set_cookie(getenv('SESSION_NAME'), session_id)
-    return response
-
-
-@app_views.route('/auth_session/logout', methods=['DELETE'],
-                 strict_slashes=False)
-def logout():
-    """ Logs out user and destroys session
-        User needs to be logged in with a session
-        id associated with their user_id
+    Session Authentication class implementation
     """
-    from api.v1.app import auth
-    status = auth.destroy_session(request)
-    if not status:
-        abort(404)
-    return jsonify({}), 200
+    user_id_by_session_id = {}
+
+    def create_session(self, user_id: str = None) -> Union[str, None]:
+        """
+        Create session id from random string
+        """
+        if user_id is None or type(user_id) != str:
+            return None
+        session_id = str(uuid.uuid4())
+        self.user_id_by_session_id.update({session_id: user_id})
+        return session_id
+
+    def user_id_for_session_id(
+        self, session_id: str = None
+    ) -> Union[str, None]:
+        """
+        Get user id from given session id
+        """
+        if session_id is None or type(session_id) != str:
+            return None
+        return self.user_id_by_session_id.get(session_id, None)
+
+    def current_user(self, request=None) -> Union[TypeVar('User'), None]:
+        """
+        Holds the current authenticated logged in user
+        """
+        User.load_from_file()
+        return User.get(
+            self.user_id_for_session_id(self.session_cookie(request))
+        )
+
+    def destroy_session(self, request=None) -> bool:
+        """
+        Deletes the user session / logout
+        """
+        if request is None:
+            return False
+        session_id = self.session_cookie(request)
+        if session_id is None:
+            return False
+        user_id = self.user_id_for_session_id(session_id)
+        if user_id is None:
+            return False
+        del self.user_id_by_session_id[session_id]
+        return True

@@ -1,53 +1,61 @@
 #!/usr/bin/env python3
 """
-Authentication module for API
+A module: Defines an template class for all template
+for all authentication system implemented in this application
 """
+import os
 from flask import request
-from typing import Any, List, TypeVar, Optional
-from os import getenv
+
+from typing import (
+    List,
+    TypeVar,
+    Union
+)
 
 
 class Auth:
     """
-    Authentication class
+    API authentication class
     """
     def require_auth(self, path: str, excluded_paths: List[str]) -> bool:
-        """ Check if authentication is required to access path
-            Return:
-                - True if path requires authentication
-                - False if path doesn't need authentication
         """
-        if not excluded_paths or not path:
+        Requires authentication on every request
+        """
+        if (
+            path is None
+            or excluded_paths is None
+            or len(excluded_paths) == 0
+        ):
             return True
-        path = path if path.endswith('/') else path + '/'
-        for excluded_path in excluded_paths:
-            if path.startswith(excluded_path.strip("*")):
-                return False
+        for url in excluded_paths:
+            if url.endswith('*'):
+                if url[:-1] in path:
+                    return False
+            else:
+                if path in url or path + '/' in url:
+                    return False
         return True
 
-    def authorization_header(self, request=None) -> Optional[str]:
-        """ Check for authorization header in request
-            Return:
-                - Authorization header content if present
-                - None if authorization header is absent
+    def authorization_header(self, request=None) -> Union[str, None]:
         """
-        if not request or 'Authorization' not in request.headers:
+        Extract authorization header
+        """
+        auth = request.headers.get('Authorization', None) if request else None
+        if request is None or auth is None:
             return None
-        return request.headers.get('Authorization')
+        return auth
 
-    def current_user(self, request=None) -> TypeVar('User'):
-        """ Returns user object
-            Return:
-                - None
+    def current_user(self, request=None) -> Union[TypeVar('User'), None]:
+        """
+        Holds the current authenticated logged in user
         """
         return None
 
-    def session_cookie(self, request=None) -> Any:
-        """ Get session id from a request's session cookie
-            Return:
-                - session id stored in cookie
+    def session_cookie(self, request=None) -> Union[str, None]:
         """
-        if not request:
+        Get a cookie value from a request object
+        """
+        if request is None:
             return None
-        session_cookie = request.cookies.get(getenv('SESSION_NAME'))
-        return session_cookie
+        cookie_name = os.getenv('SESSION_NAME')
+        return request.cookies.get(cookie_name)
