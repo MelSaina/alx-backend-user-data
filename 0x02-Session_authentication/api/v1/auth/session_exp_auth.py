@@ -51,8 +51,4 @@ class SessionExpAuth(SessionAuth):
         if timedelta(seconds=self.session_duration) + \
                 session_dictionary.get('created_at') <= datetime.now():
             return None
-<<<<<<< HEAD
         return session_dictionary.get('user_id')
-=======
-        return user_id
->>>>>>> ffd2006 (changes)
