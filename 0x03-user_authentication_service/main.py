@@ -2,7 +2,6 @@
 """
 End to end integration testing
 """
-<<<<<<< HEAD
 import requests
 
 domain: str = "http://0.0.0.0:5000/%s"
@@ -121,16 +120,3 @@ if __name__ == "__main__":
     reset_token = reset_password_token(EMAIL)
     update_password(EMAIL, reset_token, NEW_PASSWD)
     log_in(EMAIL, NEW_PASSWD)
-=======
-
-from db import DB
-from user import User
-
-my_db = DB()
-
-user_1 = my_db.add_user("test@test.com", "SuperHashedPwd")
-print(user_1.id)
-
-user_2 = my_db.add_user("test1@test.com", "SuperHashedPwd1")
-print(user_2.id)
->>>>>>> 8ef7488f8169c0ef995746d1b8d5b1797050d5c2
